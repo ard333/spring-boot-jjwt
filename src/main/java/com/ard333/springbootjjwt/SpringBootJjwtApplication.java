@@ -1,4 +1,4 @@
-package id.web.ard.springbootjjwt;
+package com.ard333.springbootjjwt;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;

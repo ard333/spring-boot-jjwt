@@ -1,46 +1,34 @@
-/*
- * Ardiansyah | http://ard.web.id
- * 
- */
-package id.web.ard.springbootjjwt.security;
+package com.ard333.springbootjjwt.security;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import com.ard333.springbootjjwt.security.handler.ForbiddenHandler;
+import com.ard333.springbootjjwt.security.handler.UnauthorizedHandler;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 /**
  *
- * @author ardiansyah
+ * @author ard333
  */
-@SuppressWarnings("SpringJavaAutowiringInspection")
 @Configuration
 @EnableWebSecurity
 @EnableGlobalMethodSecurity(prePostEnabled = true)
 public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
 
-	@Autowired
-	private UnauthorizedHandler unauthorizedHandler;
-
-	@Autowired
-	private UserDetailsService userDetailsService;
-
-	@Autowired
-	public void configureAuthentication(AuthenticationManagerBuilder authenticationManagerBuilder) throws Exception {
-		authenticationManagerBuilder.userDetailsService(this.userDetailsService).passwordEncoder(passwordEncoder());
+	@Bean
+    public UnauthorizedHandler unauthorizedHandler() throws Exception {
+        return new UnauthorizedHandler();
 	}
 	
 	@Bean
-    public PasswordEncoder passwordEncoder() {
-        return new PBKDF2Encoder();
+    public ForbiddenHandler forbiddenHandler() throws Exception {
+        return new ForbiddenHandler();
     }
 	
 	@Bean
@@ -54,7 +42,8 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
 			// we don't need CSRF because our token is invulnerable
 			.csrf().disable()
 			
-			.exceptionHandling().authenticationEntryPoint(unauthorizedHandler).and()
+			.exceptionHandling().authenticationEntryPoint(unauthorizedHandler()).and()
+			.exceptionHandling().accessDeniedHandler(forbiddenHandler()).and()
 			
 			// don't create session
 			.sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS).and()
@@ -62,7 +51,7 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
 			.authorizeRequests()
 			
 			// allow auth url
-			.antMatchers("/auth").permitAll()
+			.antMatchers("/login").permitAll()
 			
 			.anyRequest().authenticated();
 		

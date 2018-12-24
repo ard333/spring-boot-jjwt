@@ -1,34 +1,35 @@
-/*
- * Ardiansyah | http://ard.web.id
- * 
- */
-package id.web.ard.springbootjjwt.security;
+package com.ard333.springbootjjwt.security;
 
-import id.web.ard.springbootjjwt.security.model.JWTUser;
-import id.web.ard.springbootjjwt.security.model.Role;
-import io.jsonwebtoken.Claims;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.List;
+
 import javax.servlet.FilterChain;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import java.util.List;
+
+import com.ard333.springbootjjwt.entity.User;
+import com.ard333.springbootjjwt.security.model.Role;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import io.jsonwebtoken.Claims;
+import lombok.extern.log4j.Log4j2;
+
 /**
  *
- * @author ardiansyah
+ * @author ard333
  */
+@Log4j2
 public class AuthenticationFilter extends OncePerRequestFilter {
-	
+
 	@Autowired
-	private JWTUtil jwtTokenUtil;
+	private JWTUtil jwtUtil;
 
 	private final String authHeader = "Authorization";
 
@@ -46,39 +47,29 @@ public class AuthenticationFilter extends OncePerRequestFilter {
 		
 		final String authHeader = request.getHeader(this.authHeader);
 		
-		String username;
-		String authToken;
-		
 		if (authHeader != null && authHeader.startsWith("Bearer ")) {
-			authToken = authHeader.substring(7);
-			try {
-				username = jwtTokenUtil.getUsernameFromToken(authToken);
-			} catch (Exception e) {
-				username = null;
-				authToken = null;
-			}
-		} else {
-			username = null;
-			authToken = null;
-		}
-		
-		if (username != null && authToken != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-			Claims claims = jwtTokenUtil.getAllClaimsFromToken(authToken);
-			if (jwtTokenUtil.validateToken(authToken)) {
-				List<String> rolesMap = claims.get("role", List.class);
-				List<Role> roles = new ArrayList<>();
-				for (String rolemap : rolesMap) {
-					roles.add(Role.valueOf(rolemap));
+			String token = authHeader.substring(7);
+			if (jwtUtil.validateToken(token)) {
+				try {
+					Claims claims = jwtUtil.getAllClaimsFromToken(token);
+					List<String> rolesString = claims.get("role", List.class);
+					Boolean enabled = claims.get("enabled", Boolean.class);
+					
+					List<Role> roles = new ArrayList<>();
+					for (String r : rolesString) {
+						roles.add(Role.valueOf(r));
+					}
+
+					User u = new User(claims.getSubject(), null, enabled, roles);
+					
+					UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(u, null, u.getAuthorities());
+					authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+					SecurityContextHolder.getContext().setAuthentication(authentication);
+				} catch (Exception e) {
+					log.error("ERROR ", e);
 				}
-				UserDetails userDetails = new JWTUser(
-					username, null, JWTUserFactory.mapToGrantedAuthorities(roles), claims.get("enable", Boolean.class)
-				);
-				UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
-				authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-				SecurityContextHolder.getContext().setAuthentication(authentication);
 			}
 		}
-		
 		if (!request.getMethod().equalsIgnoreCase("OPTIONS")) {
 			chain.doFilter(request, response);
 		}
