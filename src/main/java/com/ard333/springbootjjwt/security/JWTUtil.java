@@ -1,14 +1,18 @@
 package com.ard333.springbootjjwt.security;
 
-import com.ard333.springbootjjwt.entity.User;
-import java.io.Serializable;
-import java.util.Base64;
+import java.security.Key;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+
+import javax.annotation.PostConstruct;
+
+import com.ard333.springbootjjwt.entity.User;
+
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.security.Keys;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -17,18 +21,23 @@ import org.springframework.stereotype.Component;
  * @author ard333
  */
 @Component
-public class JWTUtil implements Serializable {
-
-	private static final long serialVersionUID = 1L;
+public class JWTUtil {
 	
 	@Value("${springbootjjwt.jjwt.secret}")
 	private String secret;
 	
 	@Value("${springbootjjwt.jjwt.expiration}")
 	private String expirationTime;
-	
+
+	private Key key;
+
+	@PostConstruct
+	public void init(){
+		this.key = Keys.hmacShaKeyFor(secret.getBytes());
+	}
+
 	public Claims getAllClaimsFromToken(String token) {
-		return Jwts.parser().setSigningKey(Base64.getEncoder().encodeToString(secret.getBytes())).parseClaimsJws(token).getBody();
+		return Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(token).getBody();
 	}
 	
 	public String getUsernameFromToken(String token) {
@@ -47,7 +56,6 @@ public class JWTUtil implements Serializable {
 	public String generateToken(User user) {
 		Map<String, Object> claims = new HashMap<>();
 		claims.put("role", user.getRoles());
-		claims.put("enabled", user.getEnabled());
 		return doGenerateToken(claims, user.getUsername());
 	}
 
@@ -56,12 +64,13 @@ public class JWTUtil implements Serializable {
 		
 		final Date createdDate = new Date();
 		final Date expirationDate = new Date(createdDate.getTime() + expirationTimeLong * 1000);
+
 		return Jwts.builder()
 				.setClaims(claims)
 				.setSubject(username)
 				.setIssuedAt(createdDate)
 				.setExpiration(expirationDate)
-				.signWith(SignatureAlgorithm.HS512, Base64.getEncoder().encodeToString(secret.getBytes()))
+				.signWith(key)
 				.compact();
 	}
 	

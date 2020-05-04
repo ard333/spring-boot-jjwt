@@ -9,23 +9,20 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import com.ard333.springbootjjwt.entity.User;
-import com.ard333.springbootjjwt.security.model.Role;
-
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import io.jsonwebtoken.Claims;
-import lombok.extern.log4j.Log4j2;
 
 /**
  *
  * @author ard333
  */
-@Log4j2
 public class AuthenticationFilter extends OncePerRequestFilter {
 
 	@Autowired
@@ -34,9 +31,11 @@ public class AuthenticationFilter extends OncePerRequestFilter {
 	private final String authHeader = "Authorization";
 
 	@Override
-	protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain) throws ServletException, IOException {
-		
-		//CORS
+	@SuppressWarnings("unchecked")
+	protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
+			throws ServletException, IOException {
+
+		// CORS
 		response.addHeader("Access-Control-Allow-Origin", "*");
 		if (request.getHeader("Access-Control-Request-Method") != null && "OPTIONS".equalsIgnoreCase(request.getMethod())) {
 			response.addHeader("Access-Control-Allow-Headers", "Authorization");
@@ -44,32 +43,30 @@ public class AuthenticationFilter extends OncePerRequestFilter {
 			response.addHeader("Access-Control-Max-Age", "1");
 			response.addHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE");
 		}
-		
-		final String authHeader = request.getHeader(this.authHeader);
-		
-		if (authHeader != null && authHeader.startsWith("Bearer ")) {
-			String token = authHeader.substring(7);
-			if (jwtUtil.validateToken(token)) {
-				try {
+
+		try {
+			String authHeader = request.getHeader(this.authHeader);
+
+			if (authHeader != null && authHeader.startsWith("Bearer ")) {
+				String token = authHeader.substring(7);
+				if (jwtUtil.validateToken(token)) {
+
 					Claims claims = jwtUtil.getAllClaimsFromToken(token);
-					List<String> rolesString = claims.get("role", List.class);
-					Boolean enabled = claims.get("enabled", Boolean.class);
-					
-					List<Role> roles = new ArrayList<>();
-					for (String r : rolesString) {
-						roles.add(Role.valueOf(r));
+					List<String> rolesMap = claims.get("role", List.class);
+					List<GrantedAuthority> authorities = new ArrayList<>();
+					for (String rolemap : rolesMap) {
+						authorities.add(new SimpleGrantedAuthority(rolemap));
 					}
 
-					User u = new User(claims.getSubject(), null, enabled, roles);
-					
-					UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(u, null, u.getAuthorities());
+					UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(claims.getSubject(), null, authorities);
 					authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 					SecurityContextHolder.getContext().setAuthentication(authentication);
-				} catch (Exception e) {
-					log.error("ERROR ", e);
 				}
 			}
+		} catch (Exception e) {
+			e.printStackTrace();
 		}
+
 		if (!request.getMethod().equalsIgnoreCase("OPTIONS")) {
 			chain.doFilter(request, response);
 		}
